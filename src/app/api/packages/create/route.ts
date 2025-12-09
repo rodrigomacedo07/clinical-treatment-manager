@@ -22,12 +22,14 @@ export async function POST(request: Request) {
     for (const item of items) {
         const { data: treatment } = await supabaseAdmin
             .from('treatments')
-            .select('price, medications(name)')
+            .select('price, unit, medications(name)')
             .eq('id', item.medicationId)
             .single();
         
 if (treatment) {
             const price = Number(treatment.price);
+            const quantity = Number(item.quantity);
+            const totalPackagePrice = price * quantity;
             
             // Prepara o pacote
             packagesToInsert.push({
@@ -41,18 +43,17 @@ if (treatment) {
             });
 
             // NOVO: Prepara a cobrança individual se tiver preço
-            if (!isNaN(price) && price > 0) {
-                // CORREÇÃO DE TIPO AQUI
+            if (!isNaN(totalPackagePrice) && totalPackagePrice > 0) {
                 const meds = treatment.medications;
-                // Se for array, pega o primeiro. Se for objeto, usa direto.
                 const medObj = Array.isArray(meds) ? meds[0] : meds;
                 const medName = medObj?.name || "Tratamento";
+                const unitName = treatment.unit || item.unit || "";
 
                 ledgerEntries.push({
                     patient_id: patientId,
                     type: 'charge',
-                    amount: price,
-                    description: `Tratamento: ${medName}`,
+                    amount: totalPackagePrice, // Valor Corrigido
+                    description: `Tratamento: ${medName} (${quantity} ${unitName})`,
                     created_at: now
                 });
             }
